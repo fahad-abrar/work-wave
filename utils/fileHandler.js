@@ -3,7 +3,7 @@ import path from'path'
 
 const storage = multer.diskStorage({
     destination:(req, file, cb)=>{
-        cb(null, path.join(__dirname,'./public/upload'))
+        cb(null, './public/upload')
     },
     filename: (req, file, cb)=>{
         const fileExt = path.extname(file.originalname)
@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
 const upload = multer({
         storage : storage,
         limits:{
-            fileSize:100000
+            fileSize:10*1024*1024
         },
         fileFilter:(req, file, cb)=>{
             if(file.fieldname === 'image'){
@@ -34,9 +34,7 @@ const upload = multer({
                     cb(new Error('only png ,jpg and jpeg format are allowed')
                     )
                 }
-            }
-
-            if(file.fieldname === 'resume'){
+            } else if(file.fieldname === 'resume'){
                 if(
                     file.mimetype === 'application/pdf'
 
@@ -46,6 +44,8 @@ const upload = multer({
                     cb(new Error('only pdf format are allowed')
                     )
                 }
+            } else{
+                cb(new Error('invalid file name'))
             }
         
         }

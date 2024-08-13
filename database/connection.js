@@ -3,9 +3,7 @@ import mongoose from 'mongoose';
 export const connectToDatabase = async () => {
     try {
         await mongoose.connect(process.env.MONGODB_URL, {
-            dbName: 'jobPportal',
-            useNewUrlParser: true,  // optional, but recommended
-            useUnifiedTopology: true // optional, but recommended
+            dbName: 'jobPportal'
         });
         console.log('Connected to the database');
     } catch (err) {

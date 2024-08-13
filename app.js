@@ -26,6 +26,7 @@ app.use(express.urlencoded({
 app.use(cookieParser())
 
 
+
 connectToDatabase()
 
 // router 
