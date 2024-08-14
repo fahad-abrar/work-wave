@@ -36,7 +36,7 @@ class authUser{
         }
 
     }
-    
+
     static async getUserbyId(req, res){
         try {
             const { id } = req.params
@@ -218,7 +218,7 @@ class authUser{
         }
 
     }
-
+    
     static async logOutUser(req, res){
         try {
             return res.status(200).json({
@@ -318,6 +318,71 @@ class authUser{
 
     }
 
+    static async changePassword(req, res){
+        try {
+            const {id } = req.params
+            const {password, newPassword, confirmPassword} = req.body
+
+            //check all the fields are provided
+            if (!password || !newPassword || !confirmPassword){
+                return res.status(404).json({
+                    success: false,
+                    message: 'all fields are required'
+                })
+            }
+            //find the user by id
+            const findUser = await User.findById(id)
+
+            if (!findUser) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            // check the current password is match
+            const isMatch = bcrypt.compareSync(password, findUser.password)
+
+            if (!isMatch) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'password does not match'
+                });
+            }
+
+            // check if the new pass and confirm pass are same
+            if (newPassword !== confirmPassword) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'new password and confirm must be same'
+                });
+            }
+
+            // hash the new pass
+            const salt = bcrypt.genSaltSync(10)
+            const hashPass = bcrypt.hashSync(newPassword, salt)
+
+            //update the new password and save
+            findUser.password = hashPass
+            await findUser.save()
+
+
+            return res.status(200).json({
+                success: true,
+                message:'password updated successfully',
+                findUser
+            })
+            
+        } catch (error) {
+            console.log(error)
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            })
+            
+        }
+
+    }
 
 }
 

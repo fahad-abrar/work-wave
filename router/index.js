@@ -12,7 +12,8 @@ router.post('/auth/login', authUser.logInUser )
 router.get('/auth/logout', authUser.logOutUser )
 router.put('/auth/update/:id', authUser.updateUser )
 router.delete('/auth/delete/:id', authUser.deleteUser )
-router.put('/auth/updatepassword', authUser.getUser )
+router.post('/auth/changepassword/:id', authUser.changePassword )
+router.post('/auth/forgotpassword/:id', authUser.getUser )
 
 
 
