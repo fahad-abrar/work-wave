@@ -11,9 +11,12 @@ class authUser{
 
     static async getUser(req, res){
         try {
+            const userData = await User.find()
+
             return res.status(200).json({
                 success: true,
-                message:' user get successfully'
+                message:' user get successfully',
+                userData
             })
             
         } catch (error) {
@@ -173,8 +176,12 @@ class authUser{
             })
 
             console.log(token)
-            //const option={ }
-            return res.cookie('token', token).status(200).json({
+            const option={ 
+                expires : new Date(Date.now() + 24*60*60*1000),
+                httpOnly: true
+            }
+
+            return res.cookie('token', token, option).status(200).json({
                 success: true,
                 message:' user get successfully',
                 token

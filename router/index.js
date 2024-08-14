@@ -2,9 +2,10 @@ import express from 'express'
 import authUser from '../controller/userController.js'
 import multerUploader from '../utils/fileHandler.js'
 const router =express.Router()
+import authValidator from '../middleware/authMidleware.js'
 
 // register router
-router.get('/auth/user', authUser.getUser )
+router.get('/auth/user', authValidator, authUser.getUser )
 router.get('/auth/user/:id', authUser.getUser )
 router.post('/register',multerUploader, authUser.registerUser )
 router.post('/auth/login', authUser.logInUser )
