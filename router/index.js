@@ -5,12 +5,7 @@ const router =express.Router()
 
 // register router
 router.get('/register', authUser.getUser )
-router.get('/register/:id', authUser.getUserbyId )
 router.post('/register',multerUploader, authUser.registerUser )
-router.post('/auth/login', authUser.logInUser )
-router.get('/register/:id', authUser.logOutUser )
-router.delete('/register/:id', authUser.deleteUser )
-router.put('/register/:id', authUser.updateUser )
 
 
 
