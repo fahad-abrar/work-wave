@@ -11,7 +11,15 @@ class authUser{
 
     static async getUser(req, res){
         try {
+            // find all user data
             const userData = await User.find()
+
+            if(!userData){
+                return res.status(400).json({
+                    success: true,
+                    message:' user data is not found'
+                })
+            }
 
             return res.status(200).json({
                 success: true,
@@ -28,22 +36,37 @@ class authUser{
         }
 
     }
+    
     static async getUserbyId(req, res){
         try {
+            const { id } = req.params
+
+            //find the user by id
+            const findUser = await User.findById(id)
+            if(!findUser){
+                return res.status(400).json({
+                    success: false,
+                    message:' user is not found by this id'
+                }) 
+            }
+
             return res.status(200).json({
                 success: true,
-                message:' user get successfully'
+                message:' user retrieved successfully',
+                findUser
             })
             
         } catch (error) {
             console.log(error)
             return res.status(400).json({
-                success: false
+                success: false,
+                message:' an err is occured while retrieved the user'
             })
             
         }
 
     }
+
     static async registerUser(req, res){
             try {
                 const { name, email, password, phone, address,firstNiche, secondNiche, thirdNiche, coverLetter, workAs } = req.body;
@@ -128,7 +151,6 @@ class authUser{
 
     }
 
-
     static async logInUser(req, res){
         try {
             const {email, password} = req.body
@@ -197,7 +219,6 @@ class authUser{
 
     }
 
-
     static async logOutUser(req, res){
         try {
             return res.status(200).json({
@@ -214,33 +235,83 @@ class authUser{
         }
 
     }
+
     static async updateUser(req, res){
         try {
+            const {id } = req.params
+            const updateData = req.body
+
+            // update the user data
+            const findUser = await User.findByIdAndUpdate(id, updateData, {
+                new:true
+            })
+
+            if (!findUser) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+            
+            // Check if an image is provided
+            if (req.files && req.files.image) {
+                findUser.image.public_id = req.files.image[0].filename
+                findUser.image.url = req.files.image[0].path            
+            }
+
+            // check if resume is provided
+            if (req.files && req.files.resume) {
+                findUser.resume.public_id = req.files.resume[0].filename
+                findUser.resume.url = req.files.resume[0].path
+            
+            }
+
+            // save the image and resume in user data
+            await findUser.save()
+            console.log(findUser)
+
             return res.status(200).json({
                 success: true,
-                message:' user get successfully'
+                message:' user updated successfully',
+                findUser
             })
             
         } catch (error) {
             console.log(error)
             return res.status(400).json({
-                success: false
+                success: false,
+                massage: error.massage
             })
             
         }
 
     }
+
     static async deleteUser(req, res){
         try {
+            const {id } = req.params
+            
+            // delete the user finding by the id
+            const findUser = await User.findByIdAndDelete(id)
+            
+            if (!findUser) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
             return res.status(200).json({
                 success: true,
-                message:' user get successfully'
+                message:' user deleted successfully',
+                findUser
             })
             
         } catch (error) {
             console.log(error)
             return res.status(400).json({
-                success: false
+                success: false,
+                message: error.message
             })
             
         }
