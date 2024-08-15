@@ -145,14 +145,40 @@ class JobAapplication{
 
     static async updateJob( req, res ){
         try {
+            const { id } = req.params
+            const updateData = req.body
 
-
-
-
-
+            // find the job 
+            const findJob = await Job.findById( id )
+            
+            if(!findJob){
+                return res.status(400).json({
+                    success: false,
+                    message: 'job is not found'
+                })
+            }
+            //find the auth user of the post
+            const authUser = await User.findById(req.user.id)
+    
+            // determine if the user is the job poster or an admin
+            const isJobPoster = findJob.postedBy.toString() === authUser.id;
+            const isAdmin = authUser.workAs === 'admin';
+    
+            // only allow the job poster or an admin to update the job
+            if (!isJobPoster && !isAdmin) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Only the job poster or an admin can update this job'
+                });
+            }
+            
+            const updateJob = await Job.findByIdAndUpdate(id, updateData,{
+                new: true
+            })
             return res.status(200).json({
                 success: true,
-                message: ''
+                message: '',
+                job: updateJob
             })
 
         } catch (err) {
@@ -176,6 +202,21 @@ class JobAapplication{
                     success: false,
                     message: 'job is not found'
                 })
+            }
+
+            // find the auth user of the job
+            const authUser  = await User.findById(req.user.id)
+
+            // determine if the user is the job poster or an admin
+            const isJobPoster = findJob.postedBy.toString() === authUser.id;
+            const isAdmin = authUser.workAs === 'admin';
+    
+            // only allow the job poster or an admin to update the job
+            if (!isJobPoster && !isAdmin) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Only the job poster or an admin can update this job'
+                });
             }
 
             // delete the job
