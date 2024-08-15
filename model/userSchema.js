@@ -45,7 +45,7 @@ const userSchema = new mongoose.Schema({
     },
     workAs:{
         type:String,
-        enum:['jobSeeker', 'employe']
+        enum:[ 'admin', 'jobSeeker', 'employe']
     }
 
 },{
