@@ -20,6 +20,7 @@ class authUser{
                     message:' user data is not found'
                 })
             }
+            console.log(req.user)
 
             return res.status(200).json({
                 success: true,

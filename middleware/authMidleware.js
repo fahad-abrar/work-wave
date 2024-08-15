@@ -25,6 +25,7 @@ const authValidator =async(req,res, next)=>{
         const decoded = jwt.verify(token, process.env.JWT_SECRET)
         // attach user information to the request object
         req.user = decoded
+        //console.log(req.user)
         next()
 
     } catch (err){
