@@ -19,6 +19,7 @@ router.post('/auth/forgotpassword/:id', authUser.getUser )
 
 // job application router
 router.get('/job/getjob', authValidator , JobAapplication.getJob )
+router.get('/job/search', authValidator , JobAapplication.searchJob )
 router.get('/job/:id', JobAapplication.getJobById )
 router.post('/job/postjob',authValidator, JobAapplication.postJob )
 router.put('/job/:id',authValidator, JobAapplication.updateJob )

@@ -237,6 +237,76 @@ class JobAapplication{
         }
     }
 
+    static async searchJob(req, res){
+        try {
+            const { city , niche, srcKeyword, page=1, limit=2} = req.query
+
+            // define a object to store to query
+            const query = {}
+
+            //handleing  query to search the result
+            if(city){
+                query.location = city
+            }
+            if(niche){
+                query.jobNiche = niche
+            }
+            if(srcKeyword){
+                query.$or =[
+                    {title: {$regex: srcKeyword, $options: 'i'}},
+                    {companyName: {$regex: srcKeyword, $options: 'i'}},
+                    {introduction: {$regex: srcKeyword, $options: 'i'}}
+                ]
+
+            }
+            // appling condition to get positive number
+            if( page < 0 ){
+                page = 1
+            }
+            if( limit < 0 ){
+                limit = 1
+            }
+            // define a number of job to skip
+            const skip = (page -1)*limit
+
+            //find the job using the query
+            const findJob = await Job.find(query)
+            .limit(parseInt(page))
+            .skip(parseInt(skip))
+
+            if(findJob.length === 0 ){
+                return res.status(400).json({
+                    success: false,
+                    message: ' job is not found'
+                })
+            }
+            // find the total no of jobs and page are available
+            const totalJobs = await Job.countDocuments(query)
+            const totalPage = Math.ceil(totalJobs/limit)
+
+            // define a object to return
+            const jobDetails = {
+                jobs: totalJobs,
+                Pages: totalPage,
+                currentPage: page,
+                job:findJob
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: ' job is retrieved',
+                job: jobDetails
+            })
+
+        } catch ( err ) {
+            console.log(err)
+            return res.status(404).json({
+                success: false,
+                message: err.message
+            })
+        }
+    }
+
 }
 
 export default JobAapplication
