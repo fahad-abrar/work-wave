@@ -11,14 +11,14 @@ const router =express.Router()
 
 //user register route
 router.get('/auth/user', authValidator, authUser.getUser )
-router.get('/auth/user/:id', authUser.getUserbyId )
-router.post('/auth/register',multerUploader, authUser.registerUser )
-router.post('/auth/login', authUser.logInUser )
-router.get('/auth/logout', authUser.logOutUser )
-router.put('/auth/update/:id', authUser.updateUser )
-router.delete('/auth/delete/:id', authUser.deleteUser )
-router.post('/auth/changepassword/:id', authUser.changePassword )
-router.post('/auth/forgotpassword/:id', authUser.getUser )
+router.get('/auth/user/:id',authValidator, authUser.getUserbyId )
+router.post('/auth/register', multerUploader, authUser.registerUser )
+router.post('/auth/login', authValidator, authUser.logInUser )
+router.get('/auth/logout', authValidator, authUser.logOutUser )
+router.put('/auth/update/:id', authValidator, authUser.updateUser )
+router.delete('/auth/delete/:id', authValidator, authUser.deleteUser )
+router.post('/auth/changepassword/:id', authValidator, authUser.changePassword )
+router.post('/auth/forgotpassword/:id', authValidator, authUser.getUser )
 
 
 // job posting route

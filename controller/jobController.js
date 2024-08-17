@@ -146,10 +146,17 @@ class JobAapplication{
     static async updateJob( req, res ){
         try {
             const { id } = req.params
-            const updateData = req.body
+            const {
+             
+                personalWebsiteTitle, 
+                personalWebsiteUrl,
+                ...rest
+            
+            } = req.body;
 
             // find the job 
             const findJob = await Job.findById( id )
+            console.log(findJob)
             
             if(!findJob){
                 return res.status(400).json({
@@ -157,27 +164,44 @@ class JobAapplication{
                     message: 'job is not found'
                 })
             }
+
             //find the auth user of the post
             const authUser = await User.findById(req.user.id)
-    
-            // determine if the user is the job poster or an admin
-            const isJobPoster = findJob.postedBy.toString() === authUser.id;
-            const isAdmin = authUser.workAs === 'admin';
-    
-            // only allow the job poster or an admin to update the job
-            if (!isJobPoster && !isAdmin) {
+        
+            // only allow the job poster update the job
+            if (findJob.postedBy.toString() !== authUser.id) {
                 return res.status(403).json({
                     success: false,
-                    message: 'Only the job poster or an admin can update this job'
+                    message: 'Only the job poster is authorized to update'
                 });
             }
-            
+
+            // check if the user has personal website 
+            if(( personalWebsiteTitle && !personalWebsiteUrl ) || ( !personalWebsiteTitle && personalWebsiteUrl )){
+                return res.status(400).json({
+                    success: false,
+                    message: 'website title and url both are required'
+                })
+            }
+
+            // Prepare the data for update
+            const updateData = {
+                ...rest,
+            }
+
+            if (personalWebsiteTitle && personalWebsiteUrl) {
+                updateData.personalWebsite = {
+                    title: personalWebsiteTitle,
+                    url: personalWebsiteUrl,
+                };
+            }
+                  
             const updateJob = await Job.findByIdAndUpdate(id, updateData,{
                 new: true
             })
             return res.status(200).json({
                 success: true,
-                message: '',
+                message: 'job is updated',
                 job: updateJob
             })
 
@@ -338,7 +362,7 @@ class JobAapplication{
         }
 
 
-    } 
+    }
 
 }
 

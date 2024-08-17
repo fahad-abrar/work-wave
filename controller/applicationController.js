@@ -1,6 +1,7 @@
 import User from '../model/userSchema.js'
 import Job from '../model/jobSchema.js'
 import Application from '../model/applicationSchema.js'
+import { application } from 'express'
 
 class ApplicationCntlr{
 
@@ -78,7 +79,7 @@ class ApplicationCntlr{
             // create a object for storing the data 
             const appObject ={
                 jobSeekerInfo : {
-                    id : authUser.id,
+                    id : req.user.id,
                     name,
                     email,
                     phone,
@@ -125,80 +126,80 @@ class ApplicationCntlr{
 
     static async updateApp(req, res) {
         try {
-            const { id } = req.params; // Application ID
+            const { id } = req.params
     
-            const { name, email, phone, address, coverLetter, role } = req.body;
-    
-            // Check if all required fields are provided
-            if (!name || !email || !phone || !address || !coverLetter) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'All fields are required',
-                });
-            }
-    
-            // Retrieve the application by ID
-            const application = await Application.findById(id);
-            if (!application) {
+            const { 
+                name, 
+                email, 
+                phone, 
+                ...rest} = req.body;
+        
+            // retrieve the application by id
+            const findApp = await Application.findById(id);
+            if (!findApp) {
                 return res.status(404).json({
                     success: false,
                     message: 'Application not found',
                 });
             }
+
+            console.log('findappp ---->>>>',findApp)
     
-            // Ensure the authenticated user is the one who created the application
-            if (application.jobSeekerInfo.id.toString() !== req.user.id) {
+            // ensure the authenticated user is the one who created the application
+            if (findApp.jobSeekerInfo.id.toString() !== req.user.id) {
                 return res.status(403).json({
                     success: false,
-                    message: 'You are not authorized to update this application',
+                    message: 'only authorized user can update the application',
                 });
             }
     
-            // Retrieve the authenticated user
+            // retrieve the authenticated user
             const authUser = await User.findById(req.user.id);
     
             if (authUser.workAs !== 'jobSeeker') {
-                return res.status(400).json({
+                return res.status(404).json({
                     success: false,
-                    message: 'Only job seekers can update the application',
+                    message: 'only job seekers can update the application',
                 });
             }
     
-            let public_id = application.jobSeekerInfo.resume.public_id;
-            let url = application.jobSeekerInfo.resume.url;
+            let public_id = findApp.jobSeekerInfo.resume.public_id;
+            let url = findApp.jobSeekerInfo.resume.url;
     
-            // Handle the resume
+            // handle the resume
             if (req.files && req.files.resume) {
                 public_id = req.files.resume[0].filename;
                 url = req.files.resume[0].path;
             } else if (!public_id || !url) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Resume is required for updating the application',
+                    message: 'resume is required for updating the application',
                 });
             }
     
-            // Update the application object
-            application.jobSeekerInfo = {
-                ...application.jobSeekerInfo,
-                name,
-                email,
-                phone,
-                address,
-                coverLetter,
-                resume: {
-                    public_id,
-                    url
+            // update the application object
+            const updateData = {
+                ...rest,
+                jobSeekerInfo:{
+                    ...findApp.jobSeekerInfo,
+                    ...rest,
+                    resume: {
+                        public_id,
+                        url
+                    }
                 }
             };
     
-            // Save the updated application to the database
-            await application.save();
+            // save the updated application to the database
+            const updateApp = await Application.findByIdAndUpdate( id, updateData, {
+                new: true
+            })
+            console.log(updateApp)
     
             return res.status(200).json({
                 success: true,
                 message: 'Application updated successfully',
-                job: application
+                application: updateApp 
             });
     
         } catch (err) {

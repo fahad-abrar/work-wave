@@ -240,20 +240,43 @@ class authUser{
     static async updateUser(req, res){
         try {
             const {id } = req.params
-            const updateData = req.body
+
+            const { 
+                firstNiche,
+                secondNiche, 
+                thirdNiche,
+                ...rest } = req.body
+
+            // retrieve the authorized user 
+            const authUser = await User.findById(req.user.id)
 
             // update the user data
-            const findUser = await User.findByIdAndUpdate(id, updateData, {
-                new:true
-            })
+            const findUser = await User.findById(id)
 
             if (!findUser) {
                 return res.status(404).json({
                     success: false,
                     message: 'User not found'
-                });
+                })
             }
+
             
+            // check if the user is authorized to update or not
+            if(authUser.id !== findUser.id){
+                return res.status(404).json({
+                    success: false,
+                    message: 'only authorized  user can update'
+                })
+            }
+
+            // check if workas a jobseeker then first niche is provided or not
+            if (findUser.workAs === 'jobSeeker' && !firstNiche) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'first niche is required'
+                })
+            }
+                       
             // Check if an image is provided
             if (req.files && req.files.image) {
                 findUser.image.public_id = req.files.image[0].filename
@@ -267,14 +290,26 @@ class authUser{
             
             }
 
-            // save the image and resume in user data
-            await findUser.save()
-            console.log(findUser)
+            // prepare the data for update
+            const updateData = {
+                ...rest,
+                niche:{
+                    firstNiche,
+                    secondNiche,
+                    thirdNiche
+                }
+            }
+
+            const updateUser = await User.findByIdAndUpdate(id, updateData,{
+                new: true
+            })
+            
+            console.log(updateUser)
 
             return res.status(200).json({
                 success: true,
                 message:' user updated successfully',
-                findUser
+                updateUser: updateUser
             })
             
         } catch (error) {
