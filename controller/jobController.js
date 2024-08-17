@@ -307,6 +307,39 @@ class JobAapplication{
         }
     }
 
+    static async myJob( req, res ){
+
+        try {
+            // retrieve the authenticated user
+            const authUser =  req.user 
+
+            // find the posted job
+            const findJob = await Job.find({ postedBy: authUser.id })
+
+            if(findJob.length === 0){
+                return res.status(404).json({
+                    success: false,
+                    message: 'no job found'
+                })
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: ' job is retrieved',
+                jobs: findJob
+            })
+
+        } catch (err) {
+            console.log(err)
+            return res.status(404).json({
+                success: false,
+                message: err.message
+            })
+        }
+
+
+    } 
+
 }
 
 export default JobAapplication
