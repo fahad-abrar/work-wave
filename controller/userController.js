@@ -4,60 +4,45 @@ import createToken from "../middleware/logInJwtToken.js";
 import ErrorHandler from "../middleware/errorHandler.js";
 
 class authUser {
-  static async getUser(req, res) {
+  static async getUser(req, res, next) {
     try {
-      // find all user data
+      // check if the user is exist or not
       const userData = await User.find();
-
       if (!userData) {
-        return res.status(400).json({
-          success: true,
-          message: " user data is not found",
-        });
+        return next(new ErrorHandler("user is not found", 404));
       }
-      console.log(req.user);
 
+      // send the  response
       return res.status(200).json({
         success: true,
         message: " user get successfully",
         userData,
       });
     } catch (error) {
-      console.log(error);
-      return res.status(400).json({
-        success: false,
-      });
+      return next(new ErrorHandler(error.message, 500));
     }
   }
-
-  static async getUserbyId(req, res) {
+  static async getUserbyId(req, res, next) {
     try {
       const { id } = req.params;
 
-      //find the user by id
+      // check if the user is exist or not
       const findUser = await User.findById(id);
       if (!findUser) {
-        return res.status(400).json({
-          success: false,
-          message: " user is not found by this id",
-        });
+        return next(new ErrorHandler("user is not found", 404));
       }
 
+      // send the response
       return res.status(200).json({
         success: true,
         message: " user retrieved successfully",
         findUser,
       });
     } catch (error) {
-      console.log(error);
-      return res.status(400).json({
-        success: false,
-        message: " an err is occured while retrieved the user",
-      });
+      return next(new ErrorHandler(error.massage, 500));
     }
   }
-
-  static async registerUser(req, res) {
+  static async registerUser(req, res, next) {
     try {
       const {
         name,
@@ -74,29 +59,22 @@ class authUser {
 
       //check all the field are provided or not
       if (!name || !email || !password || !phone || !address || !workAs) {
-        return res.status(400).json({
-          success: false,
-          message: "all the field are required ....",
-        });
+        return next(new ErrorHandler("all fields are required", 404));
       }
 
+      // check if the job seeker provide the niche or not
       if (workAs === "jobSeeker") {
         if (!firstNiche) {
-          return res.status(400).json({
-            success: false,
-            message: "first niche is required",
-          });
+          return next(new ErrorHandler("first niche is required", 404));
         }
       }
 
       // Check if the user already exists
       const existUser = await User.findOne({ email });
       if (existUser) {
-        return res.status(400).json({
-          success: false,
-          message: "Email is already used",
-        });
+        return next(new ErrorHandler("user is already is already exist", 404));
       }
+
       // generating hash password
       const salt = bcrypt.genSaltSync(10);
       const hashPass = bcrypt.hashSync(password, salt);
@@ -141,14 +119,9 @@ class authUser {
         newUser,
       });
     } catch (error) {
-      console.log(error);
-      return res.status(400).json({
-        success: false,
-        message: "An error occurred during registration",
-      });
+      return next(new ErrorHandler(error.message, 500));
     }
   }
-
   static async logInUser(req, res, next) {
     try {
       const { email, password } = req.body;
@@ -202,7 +175,6 @@ class authUser {
       next(new ErrorHandler(error.message, 404));
     }
   }
-
   static async logOutUser(req, res, next) {
     try {
       // access the id from the auth user
@@ -234,11 +206,9 @@ class authUser {
       return next(new ErrorHandler(error.message, 404));
     }
   }
-
-  static async updateUser(req, res) {
+  static async updateUser(req, res, next) {
     try {
       const { id } = req.params;
-
       const { firstNiche, secondNiche, thirdNiche, ...rest } = req.body;
 
       // retrieve the authorized user
@@ -248,26 +218,19 @@ class authUser {
       const findUser = await User.findById(id);
 
       if (!findUser) {
-        return res.status(404).json({
-          success: false,
-          message: "User not found",
-        });
+        return next(new ErrorHandler("user is not found", 404));
       }
 
       // check if the user is authorized to update or not
       if (authUser.id !== findUser.id) {
-        return res.status(404).json({
-          success: false,
-          message: "only authorized  user can update",
-        });
+        return next(
+          new ErrorHandler("auth user only can update the user profile", 404)
+        );
       }
 
       // check if workas a jobseeker then first niche is provided or not
       if (findUser.workAs === "jobSeeker" && !firstNiche) {
-        return res.status(400).json({
-          success: false,
-          message: "first niche is required",
-        });
+        return next(new ErrorHandler("job niche is required", 404));
       }
 
       // Check if an image is provided
@@ -292,92 +255,74 @@ class authUser {
         },
       };
 
+      // update the user profile
       const updateUser = await User.findByIdAndUpdate(id, updateData, {
         new: true,
       });
 
-      console.log(updateUser);
-
+      // send the response
       return res.status(200).json({
         success: true,
         message: " user updated successfully",
         updateUser: updateUser,
       });
     } catch (error) {
-      console.log(error);
-      return res.status(400).json({
-        success: false,
-        massage: error.massage,
-      });
+      return next(new ErrorHandler(error.message, 500));
     }
   }
-
-  static async deleteUser(req, res) {
+  static async deleteUser(req, res, next) {
     try {
       const { id } = req.params;
 
-      // delete the user finding by the id
-      const findUser = await User.findByIdAndDelete(id);
-
+      // check if the user is exist or not
+      const findUser = await User.findById(id);
       if (!findUser) {
-        return res.status(404).json({
-          success: false,
-          message: "User not found",
-        });
+        return next(new ErrorHandler("user is not found", 500));
       }
 
+      // delete the user finding by the id
+      const deleteUser = await User.findByIdAndDelete(id);
+
+      // send the response
       return res.status(200).json({
         success: true,
         message: " user deleted successfully",
         findUser,
       });
     } catch (error) {
-      console.log(error);
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
+      return next(new ErrorHandler(error.message, 500));
     }
   }
-
-  static async changePassword(req, res) {
+  static async changePassword(req, res, next) {
     try {
       const { id } = req.params;
       const { password, newPassword, confirmPassword } = req.body;
 
       //check all the fields are provided
       if (!password || !newPassword || !confirmPassword) {
-        return res.status(404).json({
-          success: false,
-          message: "all fields are required",
-        });
+        return next(new ErrorHandler("all fields are required", 404));
       }
-      //find the user by id
+      // check if the user is exist or not
       const findUser = await User.findById(id);
-
       if (!findUser) {
-        return res.status(404).json({
-          success: false,
-          message: "User not found",
-        });
+        return next(new ErrorHandler("user is not found", 404));
       }
 
       // check the current password is match
       const isMatch = bcrypt.compareSync(password, findUser.password);
 
       if (!isMatch) {
-        return res.status(404).json({
-          success: false,
-          message: "password does not match",
-        });
+        return next(new ErrorHandler("password is not match", 404));
       }
 
       // check if the new pass and confirm pass are same
       if (newPassword !== confirmPassword) {
-        return res.status(404).json({
-          success: false,
-          message: "new password and confirm must be same",
-        });
+        return next(
+          new ErrorHandler(
+            "new password and confirm password mush be match",
+            404
+          )
+        );
       }
 
       // hash the new pass
@@ -394,11 +339,7 @@ class authUser {
         findUser,
       });
     } catch (error) {
-      console.log(error);
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
+      return next(new ErrorHandler(error.message, 500));
     }
   }
 }

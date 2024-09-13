@@ -3,20 +3,19 @@ import User from "../model/userSchema.js";
 import ErrorHandler from "../middleware/errorHandler.js";
 
 class JobAapplication {
-  static async getJob(req, res) {
+  static async getJob(req, res, next) {
     try {
       // find all the job
       const allJob = await Job.find();
 
       // check the job is retrieve or not
       if (allJob.length === 0) {
-        return res.status(400).json({
-          success: true,
-          message: "job is not found",
-        });
+        return next(new ErrorHandler("job is not found", 404));
       }
+      // calculate the total no of job
       const noOfJob = allJob.length;
 
+      // send the response
       return res.status(200).json({
         success: true,
         message: "job is retrieved",
@@ -24,43 +23,30 @@ class JobAapplication {
         job: allJob,
       });
     } catch (err) {
-      console.log(err);
-      return res.status(400).json({
-        success: false,
-        message: err.message,
-      });
+      return next(new ErrorHandler(err.message, 500));
     }
   }
-
-  static async getJobById(req, res) {
+  static async getJobById(req, res, next) {
     try {
       const { id } = req.params;
 
-      // find the job
+      // check if the job is exist or not
       const findJob = await Job.findById(id);
-
       if (!findJob) {
-        return res.status(200).json({
-          success: false,
-          message: "job is not found",
-        });
+        return next(new ErrorHandler("job is not found", 404));
       }
 
+      // send the response
       return res.status(200).json({
         success: true,
         message: "job is retrieved",
         job: findJob,
       });
     } catch (err) {
-      console.log(err);
-      return res.status(400).json({
-        success: false,
-        message: err.message,
-      });
+      return next(new ErrorHandler(err.message, 500));
     }
   }
-
-  static async postJob(req, res) {
+  static async postJob(req, res, next) {
     try {
       const {
         title,
@@ -102,29 +88,14 @@ class JobAapplication {
         (personalWebsiteTitle && !personalWebsiteUrl) ||
         (!personalWebsiteTitle && personalWebsiteUrl)
       ) {
-        return res.status(400).json({
-          success: false,
-          message: "website title and url both are required",
-        });
+        return next(new ErrorHandler(" job title and url is required", 404));
       }
-      // retrieve the  authorized user
-      const user = req.user;
-
-      if (!user) {
-        return res.status(400).json({
-          success: false,
-          message: "unauthorized to post the job",
-        });
-      }
-
-      // find the user from the data base
-      const findUser = await User.findById(user.id);
+      // check if the user is eauthenticate or not
+      const findUser = await User.findById(req.user.id);
       if (!findUser) {
-        return res.status(400).json({
-          success: false,
-          message: "user not found in databse to post the job",
-        });
+        return next(new ErrorHandler(" user is not found", 404));
       }
+
       // check if the user is authorised for the post
       if (findUser.workAs !== "admin" && findUser.workAs !== "employe") {
         return res.status(400).json({
@@ -156,34 +127,25 @@ class JobAapplication {
       // create the job
       const job = await Job.create(jobData);
 
+      // send the response
       return res.status(201).json({
         success: true,
         message: "job created successfully",
         job: job,
       });
     } catch (err) {
-      console.log(err);
-      return res.status(400).json({
-        success: false,
-        message: err.message,
-      });
+      return next(new ErrorHandler(err.message, 500));
     }
   }
-
-  static async updateJob(req, res) {
+  static async updateJob(req, res, next) {
     try {
       const { id } = req.params;
       const { personalWebsiteTitle, personalWebsiteUrl, ...rest } = req.body;
 
-      // find the job
+      // check if the user is exist or not
       const findJob = await Job.findById(id);
-      console.log(findJob);
-
       if (!findJob) {
-        return res.status(400).json({
-          success: false,
-          message: "job is not found",
-        });
+        return next(new ErrorHandler("job is not found", 404));
       }
 
       //find the auth user of the post
@@ -191,10 +153,9 @@ class JobAapplication {
 
       // only allow the job poster update the job
       if (findJob.postedBy.toString() !== authUser.id) {
-        return res.status(403).json({
-          success: false,
-          message: "Only the job poster is authorized to update",
-        });
+        return next(
+          new ErrorHandler("only job poster can update the job", 404)
+        );
       }
 
       // check if the user has personal website
@@ -202,13 +163,12 @@ class JobAapplication {
         (personalWebsiteTitle && !personalWebsiteUrl) ||
         (!personalWebsiteTitle && personalWebsiteUrl)
       ) {
-        return res.status(400).json({
-          success: false,
-          message: "website title and url both are required",
-        });
+        return next(
+          new ErrorHandler("website title and url both are required", 404)
+        );
       }
 
-      // Prepare the data for update
+      // setup the skeleton
       const updateData = {
         ...rest,
       };
@@ -220,35 +180,29 @@ class JobAapplication {
         };
       }
 
+      // update the job post
       const updateJob = await Job.findByIdAndUpdate(id, updateData, {
         new: true,
       });
+
+      // send the response
       return res.status(200).json({
         success: true,
         message: "job is updated",
         job: updateJob,
       });
     } catch (err) {
-      console.log(err);
-      return res.status(400).json({
-        success: false,
-        message: err.message,
-      });
+      return next(new ErrorHandler(err.message, 500));
     }
   }
-
-  static async deleteJob(req, res) {
+  static async deleteJob(req, res, next) {
     try {
       const { id } = req.params;
 
       // find the job
       const findJob = await Job.findById(id);
-
       if (!findJob) {
-        return res.status(200).json({
-          success: false,
-          message: "job is not found",
-        });
+        return next(new ErrorHandler("job is not found", 404));
       }
 
       // find the auth user of the job
@@ -269,21 +223,17 @@ class JobAapplication {
       // delete the job
       await Job.deleteOne({ _id: id });
 
+      // send the response
       return res.status(200).json({
         success: true,
         message: "job is deleted",
         job: findJob,
       });
     } catch (err) {
-      console.log(err);
-      return res.status(500).json({
-        success: false,
-        message: err.message,
-      });
+      return next(new ErrorHandler(err.message, 500));
     }
   }
-
-  static async searchJob(req, res) {
+  static async searchJob(req, res, next) {
     try {
       const { city, niche, srcKeyword, page = 1, limit = 2 } = req.query;
 
@@ -320,10 +270,7 @@ class JobAapplication {
         .skip(parseInt(skip));
 
       if (findJob.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: " job is not found",
-        });
+        return next(new ErrorHandler("job is not found", 404));
       }
       // find the total no of jobs and page are available
       const totalJobs = await Job.countDocuments(query);
@@ -343,40 +290,28 @@ class JobAapplication {
         job: jobDetails,
       });
     } catch (err) {
-      console.log(err);
-      return res.status(404).json({
-        success: false,
-        message: err.message,
-      });
+      return next(new ErrorHandler(err.message, 500));
     }
   }
-
-  static async myJob(req, res) {
+  static async myJob(req, res, next) {
     try {
       // retrieve the authenticated user
       const authUser = req.user;
 
-      // find the posted job
+      // check if the user is exist or not
       const findJob = await Job.find({ postedBy: authUser.id });
-
       if (findJob.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: "no job found",
-        });
+        return next(new ErrorHandler("job is not found", 404));
       }
 
+      // send the response
       return res.status(200).json({
         success: true,
         message: " job is retrieved",
         jobs: findJob,
       });
     } catch (err) {
-      console.log(err);
-      return res.status(404).json({
-        success: false,
-        message: err.message,
-      });
+      return next(new ErrorHandler(err.message, 500));
     }
   }
 }

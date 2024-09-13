@@ -4,7 +4,7 @@ import Application from "../model/applicationSchema.js";
 import ErrorHandler from "../middleware/errorHandler.js";
 
 class ApplicationCntlr {
-  static async postApp(req, res) {
+  static async postApp(req, res, next) {
     try {
       const { id } = req.params;
 
@@ -12,10 +12,7 @@ class ApplicationCntlr {
 
       // check all the required field
       if (!name || !email || !phone || !address || !coverLetter) {
-        return res.status(400).json({
-          success: true,
-          message: "all the fields are required",
-        });
+        return next(new ErrorHandler("all fields are required", 404));
       }
       // // check is the user is applied or not
       const isApplied = await Application.find({
@@ -24,35 +21,27 @@ class ApplicationCntlr {
       });
 
       if (isApplied.length !== 0) {
-        return res.status(400).json({
-          success: false,
-          message: "user has already applied",
-        });
+        return next(new ErrorHandler("already applied this job", 400));
       }
 
       // retrieve the authoerized user
       const authUser = await User.findById(req.user.id);
 
       if (authUser.workAs !== "jobSeeker") {
-        return res.status(400).json({
-          success: false,
-          message: "only jobseeker can apply the job",
-        });
+        return next(
+          new ErrorHandler("only job seeker can apply fro the job", 400)
+        );
       }
       // find the jon details
       const jobDetails = await Job.findById(id);
       if (!jobDetails) {
-        return res.status(404).json({
-          success: false,
-          message: "job is not found",
-        });
+        return next(new ErrorHandler("job is not found", 404));
       }
 
       const jobid = jobDetails.postedBy.toString();
 
       // find the poster dertails
       const employeDetails = await User.findById(jobid);
-
       console.log("employe details ----", employeDetails);
 
       let public_id = null;
@@ -61,6 +50,7 @@ class ApplicationCntlr {
       // handle the resume
       if (req.files && req.files.resume) {
         console.log(req.files.resume[0].filename);
+
         public_id = req.files.resume[0].filename;
         url = req.files.resume[0].path;
       } else if (authUser.resume) {
@@ -108,15 +98,10 @@ class ApplicationCntlr {
         job: jobApp,
       });
     } catch (err) {
-      console.log(err);
-      return res.status(400).json({
-        success: false,
-        message: err.message,
-      });
+      return next(new ErrorHandler(err.message, 500));
     }
   }
-
-  static async updateApp(req, res) {
+  static async updateApp(req, res, next) {
     try {
       const { id } = req.params;
 
@@ -125,30 +110,24 @@ class ApplicationCntlr {
       // retrieve the application by id
       const findApp = await Application.findById(id);
       if (!findApp) {
-        return res.status(404).json({
-          success: false,
-          message: "Application not found",
-        });
-      }
-
-      console.log("findappp ---->>>>", findApp);
-
-      // ensure the authenticated user is the one who created the application
-      if (findApp.jobSeekerInfo.id.toString() !== req.user.id) {
-        return res.status(403).json({
-          success: false,
-          message: "only authorized user can update the application",
-        });
+        return next(new ErrorHandler("application is not found", 404));
       }
 
       // retrieve the authenticated user
       const authUser = await User.findById(req.user.id);
 
+      // ensure the authenticated user is the one who created the application
+      if (findApp.jobSeekerInfo.id.toString() !== req.user.id) {
+        return next(
+          new ErrorHandler("auth user only update this application", 404)
+        );
+      }
+
+      // check is the user is job seeker or not
       if (authUser.workAs !== "jobSeeker") {
-        return res.status(404).json({
-          success: false,
-          message: "only job seekers can update the application",
-        });
+        return next(
+          new ErrorHandler("only job seeker can update this application", 404)
+        );
       }
 
       let public_id = findApp.jobSeekerInfo.resume.public_id;
@@ -190,15 +169,10 @@ class ApplicationCntlr {
         application: updateApp,
       });
     } catch (err) {
-      console.log(err);
-      return res.status(400).json({
-        success: false,
-        message: err.message,
-      });
+      return next(new ErrorHandler(err.message, 500));
     }
   }
-
-  static async getPosterApp(req, res) {
+  static async getPosterApp(req, res, next) {
     try {
       const authuser = req.user;
 
@@ -208,10 +182,7 @@ class ApplicationCntlr {
       });
 
       if (findApp.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: "no application found",
-        });
+        return next(new ErrorHandler("application is not found", 404));
       }
 
       return res.status(200).json({
@@ -220,15 +191,10 @@ class ApplicationCntlr {
         application: findApp,
       });
     } catch (err) {
-      console.log(err);
-      return res.status(400).json({
-        success: false,
-        message: err.message,
-      });
+      return next(new ErrorHandler(err.message, 500));
     }
   }
-
-  static async getJobSeekerApp(req, res) {
+  static async getJobSeekerApp(req, res, next) {
     try {
       const authuser = req.user;
 
@@ -238,10 +204,7 @@ class ApplicationCntlr {
       });
 
       if (findApp.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: "no application found",
-        });
+        return next(new ErrorHandler("application is not found", 404));
       }
 
       return res.status(200).json({
@@ -250,23 +213,15 @@ class ApplicationCntlr {
         application: findApp,
       });
     } catch (err) {
-      console.log(err);
-      return res.status(400).json({
-        success: false,
-        message: err.message,
-      });
+      return next(new ErrorHandler(err.message, 500));
     }
   }
-
-  static async deleteApp(req, res) {
+  static async deleteApp(req, res, next) {
     try {
       const { id } = req.params;
       const findApp = await Application.findById(id);
       if (!findApp) {
-        return res.status(404).json({
-          success: false,
-          message: "application is not found",
-        });
+        return next(new ErrorHandler("application is not found", 404));
       }
       const authUser = await User.findById(req.user.id);
 
@@ -302,11 +257,7 @@ class ApplicationCntlr {
         job: findApp,
       });
     } catch (err) {
-      console.log(err);
-      return res.status(400).json({
-        success: false,
-        message: err.message,
-      });
+      return next(new ErrorHandler(err.message, 500));
     }
   }
 }
