@@ -1,427 +1,406 @@
-import { catchAsyncError } from '../middleware/catchAsyncError.js'
-import errorHandler from '../middleware/errorHandler.js'
-import User from '../model/userSchema.js'
-import jwt from 'jsonwebtoken'
-import bcrypt from 'bcryptjs'
-import multerUploader from '../utils/fileHandler.js'
-import fs from 'fs'
+import User from "../model/userSchema.js";
+import bcrypt from "bcryptjs";
+import createToken from "../middleware/logInJwtToken.js";
+import ErrorHandler from "../middleware/errorHandler.js";
 
+class authUser {
+  static async getUser(req, res) {
+    try {
+      // find all user data
+      const userData = await User.find();
 
-class authUser{
+      if (!userData) {
+        return res.status(400).json({
+          success: true,
+          message: " user data is not found",
+        });
+      }
+      console.log(req.user);
 
-    static async getUser(req, res){
-        try {
-            // find all user data
-            const userData = await User.find()
+      return res.status(200).json({
+        success: true,
+        message: " user get successfully",
+        userData,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({
+        success: false,
+      });
+    }
+  }
 
-            if(!userData){
-                return res.status(400).json({
-                    success: true,
-                    message:' user data is not found'
-                })
-            }
-            console.log(req.user)
+  static async getUserbyId(req, res) {
+    try {
+      const { id } = req.params;
 
-            return res.status(200).json({
-                success: true,
-                message:' user get successfully',
-                userData
-            })
-            
-        } catch (error) {
-            console.log(error)
-            return res.status(400).json({
-                success: false
-            })
-            
+      //find the user by id
+      const findUser = await User.findById(id);
+      if (!findUser) {
+        return res.status(400).json({
+          success: false,
+          message: " user is not found by this id",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: " user retrieved successfully",
+        findUser,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({
+        success: false,
+        message: " an err is occured while retrieved the user",
+      });
+    }
+  }
+
+  static async registerUser(req, res) {
+    try {
+      const {
+        name,
+        email,
+        password,
+        phone,
+        address,
+        firstNiche,
+        secondNiche,
+        thirdNiche,
+        coverLetter,
+        workAs,
+      } = req.body;
+
+      //check all the field are provided or not
+      if (!name || !email || !password || !phone || !address || !workAs) {
+        return res.status(400).json({
+          success: false,
+          message: "all the field are required ....",
+        });
+      }
+
+      if (workAs === "jobSeeker") {
+        if (!firstNiche) {
+          return res.status(400).json({
+            success: false,
+            message: "first niche is required",
+          });
         }
+      }
 
+      // Check if the user already exists
+      const existUser = await User.findOne({ email });
+      if (existUser) {
+        return res.status(400).json({
+          success: false,
+          message: "Email is already used",
+        });
+      }
+      // generating hash password
+      const salt = bcrypt.genSaltSync(10);
+      const hashPass = bcrypt.hashSync(password, salt);
+
+      // Prepare the user data
+      const userData = {
+        name,
+        email,
+        password: hashPass,
+        phone,
+        address,
+        niche: {
+          firstNiche,
+          secondNiche,
+          thirdNiche,
+        },
+        coverLetter,
+        workAs,
+      };
+
+      // Create the new user
+      const newUser = await User.create(userData);
+
+      // Check if an image is provided
+
+      if (req.files && req.files.image) {
+        newUser.image.public_id = req.files.image[0].filename;
+        newUser.image.url = req.files.image[0].path;
+        await newUser.save();
+      }
+      // check if resume is provided
+      if (req.files && req.files.resume) {
+        newUser.resume.public_id = req.files.resume[0].filename;
+        newUser.resume.url = req.files.resume[0].path;
+        await newUser.save();
+      }
+
+      console.log(newUser);
+      return res.status(200).json({
+        success: true,
+        message: "User registered successfully",
+        newUser,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({
+        success: false,
+        message: "An error occurred during registration",
+      });
     }
+  }
 
-    static async getUserbyId(req, res){
-        try {
-            const { id } = req.params
+  static async logInUser(req, res, next) {
+    try {
+      const { email, password } = req.body;
+      // check if all the required field are provided or not
+      if (!email || !password) {
+        return next(
+          new ErrorHandler("email and password both are required", 404)
+        );
+      }
 
-            //find the user by id
-            const findUser = await User.findById(id)
-            if(!findUser){
-                return res.status(400).json({
-                    success: false,
-                    message:' user is not found by this id'
-                }) 
-            }
+      // find the user if the user is exist
+      const findUser = await User.findOne({ email });
+      if (!findUser) {
+        return next(new ErrorHandler("user is not found", 404));
+      }
 
-            return res.status(200).json({
-                success: true,
-                message:' user retrieved successfully',
-                findUser
-            })
-            
-        } catch (error) {
-            console.log(error)
-            return res.status(400).json({
-                success: false,
-                message:' an err is occured while retrieved the user'
-            })
-            
-        }
+      // check given password is correct or not
+      const isMatch = bcrypt.compareSync(password, findUser.password);
+      if (!isMatch) {
+        return next(new ErrorHandler("password is not match", 404));
+      }
 
+      // create access token and refresh token
+      const { accessToken, refreshToken } = createToken(findUser);
+      const accessTokenExpires = parseInt(process.env.ACCESS_TOKEN_EXPIRES);
+      const refreshTokenExpires = parseInt(process.env.REFRESH_TOKEN_EXPIRES);
+
+      // option for cookies
+      const accessTokenOption = {
+        expires: new Date(Date.now() + accessTokenExpires * 1000 * 100000),
+        httpOnly: true,
+      };
+      const refreshTokenOption = {
+        expires: new Date(Date.now() + refreshTokenExpires * 1000 * 100000),
+        httpOnly: true,
+      };
+
+      // send the cookie response
+      res.cookie("accessToken", accessToken, accessTokenOption);
+      res.cookie("refreshToken", refreshToken, refreshTokenOption);
+
+      // return the respone
+      return res.status(201).json({
+        success: true,
+        message: "user is logged in",
+        user: findUser,
+        accessToken,
+        refreshToken,
+      });
+    } catch (error) {
+      next(new ErrorHandler(error.message, 404));
     }
+  }
 
-    static async registerUser(req, res){
-            try {
-                const { name, email, password, phone, address,firstNiche, secondNiche, thirdNiche, coverLetter, workAs } = req.body;
+  static async logOutUser(req, res, next) {
+    try {
+      // access the id from the auth user
+      const { id } = req.user;
 
-                //check all the field are provided or not
-                if (!name || !email || !password || !phone || !address || !workAs) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'all the field are required ....',
-                    });
-                }
+      // find the auth user
+      const user = await User.findById(id);
+      if (!user) {
+        return next(new ErrorHandler("invalid credential", 404));
+      }
 
-                if (workAs === 'jobSeeker') {
-                    if(!firstNiche){
-                    return res.status(400).json({
-                        success: false,
-                        message: 'first niche is required'
-                        })
-                    }
-                }
-                
-                // Check if the user already exists
-                const existUser = await User.findOne({ email });
-                if (existUser) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'Email is already used',
-                    });
-                }
-                // generating hash password
-                const salt = bcrypt.genSaltSync(10)
-                const hashPass = bcrypt.hashSync(password, salt)
-        
-                // Prepare the user data
-                const userData = { 
-                    name, 
-                    email, 
-                    password: hashPass,
-                    phone,
-                    address,
-                    niche:{
-                        firstNiche, 
-                        secondNiche, 
-                        thirdNiche, 
-                    },
-                    coverLetter, 
-                    workAs
-                 };
+      // set the cookie option
+      const option = {
+        expires: new Date(Date.now() + 10),
+        httpOnly: true,
+      };
 
-                // Create the new user
-                const newUser = await User.create(userData);
+      // clear the cookie and send the response
+      res.cookie("accessToken", null, option);
+      res.cookie("refreshToken", null, option);
 
-                // Check if an image is provided
-
-                if (req.files && req.files.image) {
-                    newUser.image.public_id = req.files.image[0].filename
-                    newUser.image.url = req.files.image[0].path
-                    await newUser.save()
-                }
-                // check if resume is provided
-                if (req.files && req.files.resume) {
-                    newUser.resume.public_id = req.files.resume[0].filename
-                    newUser.resume.url = req.files.resume[0].path
-                    await newUser.save()
-                }
-
-                console.log(newUser)
-                return res.status(200).json({
-                    success: true,
-                    message: 'User registered successfully',
-                    newUser,
-                })
-            } catch (error) {
-                console.log(error)
-                return res.status(400).json({
-                    success: false,
-                    message: 'An error occurred during registration',
-                });
-            }
-        
-        
-
+      // return the response
+      return res.status(200).json({
+        success: true,
+        message: " user is logout",
+        user,
+      });
+    } catch (error) {
+      return next(new ErrorHandler(error.message, 404));
     }
+  }
 
-    static async logInUser(req, res){
-        try {
-            const {email, password} = req.body
+  static async updateUser(req, res) {
+    try {
+      const { id } = req.params;
 
-            // find the user if the user is exist
-            const findUser = await User.findOne({email})
-            if(!findUser){
-                return res.status(400).json({
-                    success: false,
-                    message: 'invalid email or password'
-                    })
-                }
-            
-            
-            // Check that the password in the database is a string
-            if (typeof findUser.password !== 'string') {
-                console.log('Stored password is not a string:', findUser.password);
-                return res.status(400).json({
-                    success: false,
-                    message: 'Invalid email or password',
-                });
-            }
+      const { firstNiche, secondNiche, thirdNiche, ...rest } = req.body;
 
-            // check given password is correct or not
-            const isMatch = bcrypt.compareSync(password, findUser.password);
+      // retrieve the authorized user
+      const authUser = await User.findById(req.user.id);
 
-            // const isMatch = bcrypt.compareSync(password, findUser.password)
-            if(!isMatch){
-                return res.status(400).json({
-                    success: false,
-                    message: 'invalid email or password'
-                    })
-                }
-            
-            // generate a payload to store user data in token
-            const payload = {
-                id: findUser._id,
-                userName: findUser.name,
-                email: findUser.email
-            }
+      // update the user data
+      const findUser = await User.findById(id);
 
-            //generate a token
-            const token = jwt.sign(payload, process.env.JWT_SECRET,{
-                expiresIn:"365d"
-            })
+      if (!findUser) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
 
-            console.log(token)
-            const option={ 
-                expires : new Date(Date.now() + 24*60*60*1000),
-                httpOnly: true
-            }
+      // check if the user is authorized to update or not
+      if (authUser.id !== findUser.id) {
+        return res.status(404).json({
+          success: false,
+          message: "only authorized  user can update",
+        });
+      }
 
-            return res.cookie('token', token, option).status(200).json({
-                success: true,
-                message:' user get successfully',
-                token
-            })
-            
-        } catch (error) {
-            console.log(error)
-            return res.status(400).json({
-                success: false
-            })
-            
-        }
+      // check if workas a jobseeker then first niche is provided or not
+      if (findUser.workAs === "jobSeeker" && !firstNiche) {
+        return res.status(400).json({
+          success: false,
+          message: "first niche is required",
+        });
+      }
 
+      // Check if an image is provided
+      if (req.files && req.files.image) {
+        findUser.image.public_id = req.files.image[0].filename;
+        findUser.image.url = req.files.image[0].path;
+      }
+
+      // check if resume is provided
+      if (req.files && req.files.resume) {
+        findUser.resume.public_id = req.files.resume[0].filename;
+        findUser.resume.url = req.files.resume[0].path;
+      }
+
+      // prepare the data for update
+      const updateData = {
+        ...rest,
+        niche: {
+          firstNiche,
+          secondNiche,
+          thirdNiche,
+        },
+      };
+
+      const updateUser = await User.findByIdAndUpdate(id, updateData, {
+        new: true,
+      });
+
+      console.log(updateUser);
+
+      return res.status(200).json({
+        success: true,
+        message: " user updated successfully",
+        updateUser: updateUser,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({
+        success: false,
+        massage: error.massage,
+      });
     }
-    
-    static async logOutUser(req, res){
-        try {
-            return res.status(200).json({
-                success: true,
-                message:' user get successfully'
-            })
-            
-        } catch (error) {
-            console.log(error)
-            return res.status(400).json({
-                success: false
-            })
-            
-        }
+  }
 
+  static async deleteUser(req, res) {
+    try {
+      const { id } = req.params;
+
+      // delete the user finding by the id
+      const findUser = await User.findByIdAndDelete(id);
+
+      if (!findUser) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: " user deleted successfully",
+        findUser,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
     }
+  }
 
-    static async updateUser(req, res){
-        try {
-            const {id } = req.params
+  static async changePassword(req, res) {
+    try {
+      const { id } = req.params;
+      const { password, newPassword, confirmPassword } = req.body;
 
-            const { 
-                firstNiche,
-                secondNiche, 
-                thirdNiche,
-                ...rest } = req.body
+      //check all the fields are provided
+      if (!password || !newPassword || !confirmPassword) {
+        return res.status(404).json({
+          success: false,
+          message: "all fields are required",
+        });
+      }
+      //find the user by id
+      const findUser = await User.findById(id);
 
-            // retrieve the authorized user 
-            const authUser = await User.findById(req.user.id)
+      if (!findUser) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
 
-            // update the user data
-            const findUser = await User.findById(id)
+      // check the current password is match
+      const isMatch = bcrypt.compareSync(password, findUser.password);
 
-            if (!findUser) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'User not found'
-                })
-            }
+      if (!isMatch) {
+        return res.status(404).json({
+          success: false,
+          message: "password does not match",
+        });
+      }
 
-            
-            // check if the user is authorized to update or not
-            if(authUser.id !== findUser.id){
-                return res.status(404).json({
-                    success: false,
-                    message: 'only authorized  user can update'
-                })
-            }
+      // check if the new pass and confirm pass are same
+      if (newPassword !== confirmPassword) {
+        return res.status(404).json({
+          success: false,
+          message: "new password and confirm must be same",
+        });
+      }
 
-            // check if workas a jobseeker then first niche is provided or not
-            if (findUser.workAs === 'jobSeeker' && !firstNiche) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'first niche is required'
-                })
-            }
-                       
-            // Check if an image is provided
-            if (req.files && req.files.image) {
-                findUser.image.public_id = req.files.image[0].filename
-                findUser.image.url = req.files.image[0].path            
-            }
+      // hash the new pass
+      const salt = bcrypt.genSaltSync(10);
+      const hashPass = bcrypt.hashSync(newPassword, salt);
 
-            // check if resume is provided
-            if (req.files && req.files.resume) {
-                findUser.resume.public_id = req.files.resume[0].filename
-                findUser.resume.url = req.files.resume[0].path
-            
-            }
+      //update the new password and save
+      findUser.password = hashPass;
+      await findUser.save();
 
-            // prepare the data for update
-            const updateData = {
-                ...rest,
-                niche:{
-                    firstNiche,
-                    secondNiche,
-                    thirdNiche
-                }
-            }
-
-            const updateUser = await User.findByIdAndUpdate(id, updateData,{
-                new: true
-            })
-            
-            console.log(updateUser)
-
-            return res.status(200).json({
-                success: true,
-                message:' user updated successfully',
-                updateUser: updateUser
-            })
-            
-        } catch (error) {
-            console.log(error)
-            return res.status(400).json({
-                success: false,
-                massage: error.massage
-            })
-            
-        }
-
+      return res.status(200).json({
+        success: true,
+        message: "password updated successfully",
+        findUser,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
     }
-
-    static async deleteUser(req, res){
-        try {
-            const {id } = req.params
-            
-            // delete the user finding by the id
-            const findUser = await User.findByIdAndDelete(id)
-            
-            if (!findUser) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'User not found'
-                });
-            }
-
-            return res.status(200).json({
-                success: true,
-                message:' user deleted successfully',
-                findUser
-            })
-            
-        } catch (error) {
-            console.log(error)
-            return res.status(400).json({
-                success: false,
-                message: error.message
-            })
-            
-        }
-
-    }
-
-    static async changePassword(req, res){
-        try {
-            const {id } = req.params
-            const {password, newPassword, confirmPassword} = req.body
-
-            //check all the fields are provided
-            if (!password || !newPassword || !confirmPassword){
-                return res.status(404).json({
-                    success: false,
-                    message: 'all fields are required'
-                })
-            }
-            //find the user by id
-            const findUser = await User.findById(id)
-
-            if (!findUser) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'User not found'
-                });
-            }
-
-            // check the current password is match
-            const isMatch = bcrypt.compareSync(password, findUser.password)
-
-            if (!isMatch) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'password does not match'
-                });
-            }
-
-            // check if the new pass and confirm pass are same
-            if (newPassword !== confirmPassword) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'new password and confirm must be same'
-                });
-            }
-
-            // hash the new pass
-            const salt = bcrypt.genSaltSync(10)
-            const hashPass = bcrypt.hashSync(newPassword, salt)
-
-            //update the new password and save
-            findUser.password = hashPass
-            await findUser.save()
-
-
-            return res.status(200).json({
-                success: true,
-                message:'password updated successfully',
-                findUser
-            })
-            
-        } catch (error) {
-            console.log(error)
-            return res.status(400).json({
-                success: false,
-                message: error.message
-            })
-            
-        }
-
-    }
-
+  }
 }
 
-
-
-export default authUser
+export default authUser;

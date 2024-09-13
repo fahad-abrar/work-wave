@@ -1,42 +1,42 @@
-import express from 'express'
-import dotenv from 'dotenv'
-import cors from 'cors'
-import cookieParser from 'cookie-parser'
-import { connectToDatabase } from './database/connection.js'
-import router from './router/index.js'
-import { errMiddleware } from './middleware/errorHandler.js'
+import express from "express";
+import dotenv from "dotenv";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import { connectToDatabase } from "./database/connection.js";
+import router from "./router/index.js";
+import errMiddleware from "./middleware/errorMilddleware.js";
+import consumer from "./rabbitmq/consumer.js";
 
 dotenv.config({
-    path:'./config/config.env'
-})
-const app = express()
+  path: "./config/config.env",
+});
+const app = express();
 
 // middlewere
 app.use(
-    cors({
-        origin:'http://localhost:4001',
-        methods:['GET', 'POST', 'PUT', 'DELETE'],
-        credentials:true
-    })
-)
-app.use(express.json())
-app.use(express.urlencoded({
-    extended: true
-}))
-app.use(cookieParser())
+  cors({
+    origin: "http://localhost:4001",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
+app.use(express.json());
+app.use(
+  express.urlencoded({
+    extended: true,
+  })
+);
+app.use(cookieParser());
 
+connectToDatabase();
 
+// router
+app.use("/api", router);
 
-connectToDatabase()
-
-// router 
-app.use('/api', router)
-
-
-
+consumer();
 // error handler
-// app.use(errMiddleware)
+app.use(errMiddleware);
 
 app.listen(process.env.PORT, () => {
-  console.log(`app is listening on port ${process.env.PORT}`)
-})
+  console.log(`app is listening on port ${process.env.PORT}`);
+});
