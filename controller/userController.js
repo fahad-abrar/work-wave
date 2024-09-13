@@ -2,6 +2,7 @@ import User from "../model/userSchema.js";
 import bcrypt from "bcryptjs";
 import createToken from "../middleware/logInJwtToken.js";
 import ErrorHandler from "../middleware/errorHandler.js";
+import resetToken from "../middleware/resetToken.js";
 
 class authUser {
   static async getUser(req, res, next) {
@@ -75,15 +76,11 @@ class authUser {
         return next(new ErrorHandler("user is already is already exist", 404));
       }
 
-      // generating hash password
-      const salt = bcrypt.genSaltSync(10);
-      const hashPass = bcrypt.hashSync(password, salt);
-
       // Prepare the user data
       const userData = {
         name,
         email,
-        password: hashPass,
+        password,
         phone,
         address,
         niche: {
@@ -337,6 +334,92 @@ class authUser {
         success: true,
         message: "password updated successfully",
         findUser,
+      });
+    } catch (error) {
+      return next(new ErrorHandler(error.message, 500));
+    }
+  }
+  static async forgotPassword(req, res, next) {
+    try {
+      const { email } = req.body;
+
+      // check is the user is exist or not
+      const findUser = await User.findOne({ email });
+      if (!findUser) {
+        return next(new ErrorHandler("user is not exist", 404));
+      }
+      // generate the token and its expiration time
+      const { token, hashToken, expires } = resetToken();
+
+      // store the token and its expires
+      findUser.resetPasswordToken = hashToken;
+      findUser.resetPasswordExpires = expires;
+      await findUser.save();
+
+      // generate link to reset password
+      const link = `${req.protocol}://${req.get(
+        "host"
+      )}/api/auth/password/reset/${token}`;
+
+      try {
+        // create a messsage
+        const text = `your  reset password token is :- \n\n ${link} \n\n if you have not requested this , plz ignore it`;
+        const subject = "request for reset password";
+        const mailBody = {
+          to: findUser.email,
+          subject,
+          text,
+        };
+
+        //await sendMail(mailBody)
+
+        // send the response
+        return res.status(200).json({
+          success: true,
+          message: "link send to the user email",
+          mailBody: mailBody,
+          link: link,
+        });
+      } catch (err) {
+        findUser.resetPasswordToken = undefined;
+        findUser.resetPasswordExpires = undefined;
+        await findUser.save();
+        return next(new ErrorHandler("fail to  send mail", 500));
+      }
+    } catch (error) {
+      return next(new ErrorHandler(error.message, 500));
+    }
+  }
+  static async resetPassword(req, res, next) {
+    try {
+      const { token } = req.params;
+      const { newPassword, confirmPassword } = req.body;
+
+      const hashToken = crypto.createHash("sha256").update(token).digest("hex");
+      // find the existing user
+      const findUser = await User.findOne({
+        resetPasswordToken: hashToken,
+        resetPasswordExpires: { $gt: Date.now() },
+      });
+      if (!findUser) {
+        return next(new ErrorHandler("user is not found", 404));
+      }
+
+      // check if the new pass and confirm pass are same or not
+      if (newPassword !== confirmPassword) {
+        return next(
+          new ErrorHandler("new pass and confirm pass should be same", 404)
+        );
+      }
+      // save the new password and clear the token
+      findUser.password = newPassword;
+      findUser.resetPasswordToken = undefined;
+      findUser.resetPasswordExpires = undefined;
+      await findUser.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "password is updated",
       });
     } catch (error) {
       return next(new ErrorHandler(error.message, 500));

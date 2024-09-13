@@ -1,57 +1,77 @@
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 
-const userSchema = new mongoose.Schema({
-    name:{
+const userSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    password: {
+      type: String,
+      required: true,
+    },
+    phone: {
+      type: Number,
+      required: false,
+    },
+    address: {
+      type: String,
+      required: false,
+    },
+    niche: {
+      firstNiche: {
         type: String,
-        required: true
-    },
-    email:{
+        required: false,
+      },
+      secondNiche: {
         type: String,
-        required: true,
-        unique: true
-    },
-    password:{
+        required: false,
+      },
+      thirdNiche: {
         type: String,
-        required: true
+        required: false,
+      },
     },
-    phone:{
-        type:Number,
-    },
-    address:{
-        type:String
-    },
-    niche:{
-        firstNiche:{
-            type:String
-        },
-        secondNiche:{
-            type:String
-        },
-        thirdNiche:{
-            type:String
-        }
-    },
-    coverLetter:{
-        type: String
+    coverLetter: {
+      type: String,
+      required: false,
     },
 
-    resume:{
-        public_id: String,
-        url: String
+    resume: {
+      public_id: String,
+      url: String,
     },
-    image:{
-        public_id: String,
-        url: String
+    image: {
+      public_id: String,
+      url: String,
     },
-    workAs:{
-        type:String,
-        enum:[ 'admin', 'jobSeeker', 'employe']
-    }
+    workAs: {
+      type: String,
+      enum: ["admin", "jobSeeker", "employe"],
+    },
+    resetPasswordToken: String,
+    resetPasswordExpires: Date,
+  },
+  {
+    timestamps: true,
+  }
+);
 
-},{
-    timestamps:true
-})
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) {
+    next();
+  }
 
-const User = mongoose.model('User', userSchema)
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+});
 
-export default User
+const User = mongoose.model("User", userSchema);
+
+export default User;

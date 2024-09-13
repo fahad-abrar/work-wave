@@ -12,7 +12,8 @@ userRoute.post("/login", authUser.logInUser);
 userRoute.get("/logout", authValidator, authUser.logOutUser);
 userRoute.put("/update/:id", authValidator, authUser.updateUser);
 userRoute.delete("/delete/:id", authValidator, authUser.deleteUser);
-userRoute.post("/changepassword/:id", authValidator, authUser.changePassword);
-userRoute.post("/forgotpassword/:id", authValidator, authUser.getUser);
+userRoute.post("/password/change:id", authValidator, authUser.changePassword);
+userRoute.post("/password/forgot", authUser.forgotPassword);
+userRoute.post("/reset/:token", authUser.resetPassword);
 
 export default userRoute;
